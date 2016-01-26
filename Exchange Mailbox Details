@@ -1,0 +1,37 @@
+
+############################
+# Exchange mailbox details #
+#      hydramail.net       #
+############################
+
+#accept an argument and assign it to $a
+param(
+[string]$a
+)
+
+#run in exchange powershell
+Add-PSSnapin *exchange*
+
+#append *@ before the domain name to create a wildcard
+$d = "*@" + $a
+
+#get the data and loop through each mailbox getting the extra info
+$array = @()
+get-mailbox -identity $d -resultsize unlimited | foreach-object {
+$dname=$_.DisplayName
+$email = $_.primarysmtpaddress
+$size=(Get-MailboxStatistics -identity $_).totalitemsize
+$count=(Get-MailboxStatistics -identity $_).itemcount
+$logon=(Get-MailboxStatistics -identity $_).lastlogontime
+$email = $email.Local + "@" + $email.Domain
+#arrange it in an object
+$object = New-Object -TypeName PSObject
+$object | Add-Member -Name 'Email' -MemberType Noteproperty -Value $email
+$object | Add-Member -Name 'Count' -MemberType Noteproperty -Value $count
+$object | Add-Member -Name 'Size' -MemberType Noteproperty -Value $size
+$object | Add-Member -Name 'Last Logon' -MemberType Noteproperty -Value $logon
+#put it in an array
+$array += $object
+}
+#]print the array
+$array
