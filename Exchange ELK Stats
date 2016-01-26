@@ -1,0 +1,177 @@
+
+#########################################
+# Exchange statistics collector for ELK #
+#             hydramail.net             #
+#########################################
+
+
+###########################
+# Run Exchange Powershell #
+###########################
+
+add-pssnapin *Exchange*
+
+
+############################
+# IMAP and POP connections #
+############################
+
+#hydra-cas-01
+$imap1 = [math]::Truncate((Get-Counter "\MSExchangeImap4(_total)\Current Connections" -ComputerName hydra-cas-01).CounterSamples[0].Cookedvalue)
+$pop1 = [math]::Truncate((Get-Counter "\MSExchangePOP3(_total)\Connections Current" -ComputerName hydra-cas-01).CounterSamples[0].Cookedvalue)
+
+#hydra-cas-02
+$imap2 = [math]::Truncate((Get-Counter "\MSExchangeImap4(_total)\Current Connections" -ComputerName hydra-cas-02).CounterSamples[0].Cookedvalue)
+$pop2 = [math]::Truncate((Get-Counter "\MSExchangePOP3(_total)\Connections Current" -ComputerName hydra-cas-02).CounterSamples[0].Cookedvalue)
+
+
+###############
+# 2013 Queues #
+###############
+
+#hydra-mbx-01 Queue
+$mbx01Submission=(get-queue -server hydra-mbx-01 | where {$_.DeliveryType -eq "MapiDelivery"}).MessageCount
+if ($mbx01Submission -eq $null){$mbx01Submission=0}
+
+#hydra-mbx-02 Queue
+$mbx02Submission=(get-queue -server hydra-mbx-02 | where {$_.DeliveryType -eq "MapiDelivery"}).MessageCount
+if ($mbx02Submission -eq $null){$mbx02Submission=0}
+
+
+
+########################
+# 2013 stat collection #
+########################
+
+#Total outbound queue for all hydra-mbx servers
+$mbx01Outbound=(Get-exchangeserver hydra-mbx-01 | get-queue | where {$_.DeliveryType -eq "DnsConnectorDelivery"} | measure-object messagecount -sum).sum
+if ($mbx01Outbound -eq $null){$mbx01Outbound=0}
+
+$mbx02Outbound=(Get-exchangeserver hydra-mbx-02 | get-queue | where {$_.DeliveryType -eq "DnsConnectorDelivery"} | measure-object messagecount -sum).sum
+if ($mbx02Outbound -eq $null){$mbx02Outbound=0}
+
+$mbxTotalOutbound = $mbx01Outbound + $mbx02Outbound
+if ($mbxTotalOutbound -eq $null){$mbxTotalOutbound=0}
+
+
+
+#Total Received in the last 5 minutes for all hydra-mbx servers
+$mbx01Received5=(Get-exchangeserver hydra-mbx-01 | Get-MessageTrackingLog -start (get-date).addMinutes(-5) -end (get-date) | where {$_.EventId -eq "RECEIVE" -and $_.Source -eq "SMTP"} | measure).Count
+if ($mbx01Received5 -eq $null){$mbx01Received5=0}
+
+$mbx02Received5=(Get-exchangeserver hydra-mbx-02 | Get-MessageTrackingLog -start (get-date).addMinutes(-5) -end (get-date) | where {$_.EventId -eq "RECEIVE" -and $_.Source -eq "SMTP"} | measure).Count
+if ($mbx02Received5 -eq $null){$mbx02Received5=0}
+
+$mbxReceived5 = $mbx01Received5 + $mbx02Received5
+if ($mbxReceived5 -eq $null){$mbxReceived5=0}
+
+
+#Total Sent in the last 5 minutes for all hydra-mbx servers
+$mbx01Sent5=(Get-exchangeserver hydra-mbx-01 | Get-MessageTrackingLog -start (get-date).addMinutes(-5) -end (get-date) | where {$_.EventId -eq "SEND" -and $_.Source -eq "SMTP"} | measure).Count
+if ($mbx01Sent5 -eq $null){$mbx01Sent5=0}
+
+$mbx02Sent5=(Get-exchangeserver hydra-mbx-02 | Get-MessageTrackingLog -start (get-date).addMinutes(-5) -end (get-date) | where {$_.EventId -eq "SEND" -and $_.Source -eq "SMTP"} | measure).Count
+if ($mbx02Sent5 -eq $null){$mbx02Sent5=0}
+
+$mbxSent5= $mbx01Sent5 + $mbx02Sent5
+if ($mbxSent5 -eq $null){$mbxSent5=0}
+
+
+#Total Spam in the last 5 minutes for all hydra-mbx servers
+$mbxSpam=(Get-exchangeserver hydra-mbx-* | Get-MessageTrackingLog -start (get-date).addMinutes(-5) -end (get-date) | where {$_.Messagesubject -like "*SPAM*" -and $_.Source -eq "STOREDRIVER" -and $_.EventID -eq "DELIVER"}|measure).count
+if ($mbxSpam -eq $null){$mbxSpam=0}
+
+
+
+#####################
+# Combine the stats #
+#####################
+
+$TotalOutbound = $hubTotalOutbound + $mbxTotalOutbound
+$Received5 = $hubReceived5 + $mbxReceived5
+$Sent5 = $hubSent5 + $mbxSent5 
+$Spam = $hubSpam + $mbxSpam 
+
+
+###############
+# Test Output #
+###############
+
+#Put everything into an array and make it look pretty and help debugging
+#This can be removed when it goes into production
+$array = @()
+$object = New-Object -TypeName PSObject
+
+$object | Add-Member -Name 'Hub1Submission' -MemberType Noteproperty -Value $Hub1Submission
+$object | Add-Member -Name 'Hub2Submission' -MemberType Noteproperty -Value $Hub2Submission
+$object | Add-Member -Name 'mbx01Submission' -MemberType Noteproperty -Value $mbx01Submission
+$object | Add-Member -Name 'mbx02Submission' -MemberType Noteproperty -Value $mbx02Submission
+
+$object | Add-Member -Name 'TotalOutbound' -MemberType Noteproperty -Value $TotalOutbound
+$object | Add-Member -Name 'Received5' -MemberType Noteproperty -Value $Received5
+$object | Add-Member -Name 'Sent5' -MemberType Noteproperty -Value $Sent5
+$object | Add-Member -Name 'Spam' -MemberType Noteproperty -Value $Spam
+
+$object | Add-Member -Name 'hubTotalOutbound' -MemberType Noteproperty -Value $hubTotalOutbound
+$object | Add-Member -Name 'hubReceived5' -MemberType Noteproperty -Value $hubReceived5
+$object | Add-Member -Name 'hubSent5' -MemberType Noteproperty -Value $hubSent5
+$object | Add-Member -Name 'hubSpam' -MemberType Noteproperty -Value $hubSpam
+
+$object | Add-Member -Name 'mbxTotalOutbound' -MemberType Noteproperty -Value $mbxTotalOutbound
+$object | Add-Member -Name 'mbxReceived5' -MemberType Noteproperty -Value $mbxReceived5
+$object | Add-Member -Name 'mbxSent5' -MemberType Noteproperty -Value $mbxSent5
+$object | Add-Member -Name 'mbxSpam' -MemberType Noteproperty -Value $mbxSpam
+
+$object | Add-Member -Name 'mbx01IMAP' -MemberType Noteproperty -Value $imap1
+$object | Add-Member -Name 'mbx02IMAP' -MemberType Noteproperty -Value $imap2
+$object | Add-Member -Name 'mbx01POP' -MemberType Noteproperty -Value $pop1
+$object | Add-Member -Name 'mbx02POP' -MemberType Noteproperty -Value $pop2
+
+$object | Add-Member -Name 'mbx01Outbound' -MemberType Noteproperty -Value $mbx01Outbound
+$object | Add-Member -Name 'mbx02Outbound' -MemberType Noteproperty -Value $mbx02Outbound
+
+$object | Add-Member -Name 'mbx01Received5' -MemberType Noteproperty -Value $mbx01Received5
+$object | Add-Member -Name 'mbx02Received5' -MemberType Noteproperty -Value $mbx02Received5
+
+$object | Add-Member -Name 'mbx01Sent5' -MemberType Noteproperty -Value $mbx01Sent5
+$object | Add-Member -Name 'mbx02Sent5' -MemberType Noteproperty -Value $mbx02Sent5
+
+
+
+$array += $object
+$array 
+
+
+
+#Build the JSON structure that logstash will accept
+$postParams = '{
+"imap1":"'+$imap1+'",
+"imap2":"'+$imap2+'",
+"pop1":"'+$pop1+'",
+"pop2":"'+$pop2+'",
+"Hub1Submission":"'+$Hub1Submission+'",
+"Hub2Submission":"'+$Hub2Submission+'",
+"mbx01Submission":"'+$mbx01Submission+'",
+"mbx02Submission":"'+$mbx02Submission+'",
+"TotalOutbound":"'+$TotalOutbound+'",
+"Received5":"'+$Received5+'",
+"Sent5":"'+$Sent5+'",
+"Spam":"'+$Spam+'",
+"hubTotalOutbound":"'+$hubTotalOutbound+'",
+"hubReceived5":"'+$hubReceived5+'",
+"hubSent5":"'+$hubSent5+'",
+"mbxTotalOutbound":"'+$mbxTotalOutbound+'",
+"mbxReceived5":"'+$mbxReceived5+'",
+"mbxSent5":"'+$mbxSent5+'",
+"mbxSpam":"'+$mbxSpam+'",
+"mbx01Outbound":"'+$mbx01Outbound+'",
+"mbx02Outbound":"'+$mbx02Outbound+'",
+"mbx01Received5":"'+$mbx01Received5+'",
+"mbx02Received5":"'+$mbx02Received5+'",
+"mbx01Sent5":"'+$mbx01Sent5+'",
+"mbx04Sent5":"'+$mbx02Sent5+'"}'
+
+
+
+#This is the command that will POST the data to the elk stack
+Invoke-WebRequest -Uri http://elk.hydramail.net:9000 -Method POST -Body $postParams -DisableKeepAlive -TimeoutSec 5
