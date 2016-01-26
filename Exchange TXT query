@@ -1,0 +1,25 @@
+######################
+# Exchange TXT Query #
+#    hydramail.net   #
+######################
+
+#run in exchange powershell
+Add-PSSnapin *exchange*
+
+$array = @()
+Get-AcceptedDomain | foreach-object {
+
+$name = $_.DomainName
+Resolve-DnsName -Name $name -Type TXT | foreach-object {
+
+$dname = $_.Name
+$answer = $_.Strings | Out-String
+
+$object = New-Object -TypeName PSObject
+$object | Add-Member -Name 'Domain' -MemberType Noteproperty -Value $dname
+$object | Add-Member -Name 'SPF' -MemberType Noteproperty -Value $answer
+
+$array += $object
+}
+}
+$array
