@@ -2,6 +2,7 @@
 for ( $i = 0; $i -lt $args.count; $i++ ) {
     if ($args[ $i ] -eq "-domain"){ $strDomain=$args[ $i+1 ]}
     if ($args[ $i ] -eq "-database"){ $strDatabase=$args[ $i+1 ]}
+    if ($args[ $i ] -eq "-distributiongroup"){ $strDistributionGroup=$args[ $i+1 ]}
 }
 
 #run this in exchange powershell
@@ -46,13 +47,6 @@ $strDomainList1 = Get-Mailbox -Database $strDatabase  |? {$_.useraccountcontrol 
 $strDomainList2 = $strDomainList1.CustomAttribute1
 $strDomainList2 = $strDomainList2 |  ? { $_ } | sort -uniq
 
-foreach ($strDomain3 in $strDomainList2)
-{
-
-}
-
-
-
 foreach ($strDomain2 in $strDomainList2)
 {
 
@@ -80,4 +74,27 @@ $array2 += $object2
 $array2 | Format-Table
 }
 
+}
+if ($strDistributionGroup -ne $null)
+{
+
+$strDistribution = "*@" + $strDistributionGroup
+
+$strDistList = Get-DistributionGroup -identity $strDistribution
+
+foreach ($strDistItem in $strDistList)
+{
+
+$array3 = @()
+
+Get-DistributionGroup -identity $strDistItem | Get-DistributionGroupMember | foreach-object {
+
+$object3 = New-Object -TypeName PSObject
+$object3 | Add-Member -Name 'Email' -MemberType Noteproperty -Value $_.primarysmtpaddress
+$object3 | Add-Member -Name 'Display Name' -MemberType Noteproperty -Value $_.displayname
+$object3 | Add-Member -Name 'Dist Group' -MemberType Noteproperty -Value $strDistItem
+$array3 += $object3
+}
+#print the array
+$array3 | Format-Table
 }
