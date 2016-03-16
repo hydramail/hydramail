@@ -1,0 +1,10 @@
+b.barracudacentral.org
+bb.barracudacentral.org
+sbl-xbl.spamhaus.org
+dnsbl.sorbs.net
+bl.spamcop.net
+dnsbl-1.uceprotect.net
+dnsbl-2.uceprotect.net
+dnsbl-3.uceprotect.net
+zen.spamhaus.org
+dyna.spamrats.com
