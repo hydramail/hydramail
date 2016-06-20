@@ -94,5 +94,7 @@ $body = $output | fl | Out-String
 # send an email #
 #################
 
-send-mailmessage -from "blacklist@hydramail.net" -to "andrew@hydramail.net" -subject ("Blacklist Monitoring") -body $body -BodyAsHtml -smtpServer cas-01.hydramail.net -Credential $mycreds
+$send_mail = send-mailmessage -from "blacklist@hydramail.net" -to "andrew@hydramail.net" -subject ("Blacklist Monitoring") -body $body -BodyAsHtml -smtpServer cas-01.hydramail.net -Credential $mycreds
 
+#if the blacklist DNS query returns any data, notify me
+if ($object){$send_mail}
