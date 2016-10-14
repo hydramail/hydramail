@@ -10,7 +10,6 @@
 #   based on their drift relative to an external source
 
 #   WinRM needs to be enabled on the remote servers
-#   Servers need to be on Windows 2012 due to the Invoke-WebRequest command
 
 
 #get info for progress bar
