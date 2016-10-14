@@ -18,7 +18,7 @@ $servers = @()
 #fill up the array (replace this with your own servers)
 $servers += "server1.ns1.ovh"
 $servers += "server2.ns1.ovh"
-$servers += "server2.ns1.ovh"
+$servers += "server3.ns1.ovh"
 
 #get info for progress bar
 $n = $servers.Count
